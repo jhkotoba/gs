@@ -27,19 +27,17 @@ public class ForwardAuthGatewayFilterFactory
 	@Value("${gateway.secret.key}")
 	private String gsKey;
 	
-	// OE 서버 기본 URI (application.yml의 gateway.uri.oe)
-	@Value("${gateway.uri.oe}")
-	private String oeUri;	
-	
     /**
      * 생성자: WebClient.Builder를 주입받아
      * OE 서버의 baseUrl을 설정하여 WebClient를 초기화합니다.
+     * 
+     * oeUri: OE 서버 기본 URI (application.yml의 gateway.uri.oe)
      *
      * @param builder Spring이 제공하는 WebClient.Builder
      */
-	public ForwardAuthGatewayFilterFactory(WebClient.Builder builder) {
+	public ForwardAuthGatewayFilterFactory(WebClient.Builder builder, @Value("${gateway.uri.oe}") String oeUri) {
 		super(Config.class);
-		this.webClient = builder.baseUrl(this.oeUri).build();
+		this.webClient = builder.baseUrl(oeUri).build();
 	}
 
     /**
