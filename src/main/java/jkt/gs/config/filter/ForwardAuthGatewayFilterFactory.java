@@ -55,22 +55,23 @@ public class ForwardAuthGatewayFilterFactory
     @Override
     public GatewayFilter apply(Config config) {
         return (exchange, chain) -> {
-            // Cookie 에서 토큰 추출
-        	HttpCookie cookie = exchange.getRequest()
+            
+        	// Cookie 에서 리프레시 토큰 추출
+        	HttpCookie token = exchange.getRequest()
             	.getCookies()
             	.getFirst("accessToken");
             
-            if (cookie == null) {
-                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                return exchange.getResponse().setComplete();
-            }
-            String token = cookie.getValue();
+        	// Cookie 에서 고유 식별자 추출
+            HttpCookie uuid = exchange.getRequest()
+                	.getCookies()
+                	.getFirst("uuid");
 
             // 인증 체크 호출
             return webClient.post()
                 .uri("/token/check") // 토큰 검증 엔드포인트
                 .headers(h -> {
-                    h.setBearerAuth(token);
+                    h.setBearerAuth(token.getValue());
+                    h.set("uuid", uuid.getValue());
                     h.set("X-Gateway-Secret", this.gsKey);
                 })
                 .retrieve()
