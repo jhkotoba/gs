@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -43,7 +44,7 @@ public class ForwardAuthGatewayFilterFactory
      *
      * @param builder Spring이 제공하는 WebClient.Builder
      */
-	public ForwardAuthGatewayFilterFactory(WebClient.Builder builder, @Value("${gateway.uri.oe}") String oeUri) {
+	public ForwardAuthGatewayFilterFactory(WebClient.Builder builder, @Value("${gateway.uri.oe}") @NonNull String oeUri) {
 		super(Config.class);
 		this.webClient = builder.baseUrl(oeUri).build();
 	}
