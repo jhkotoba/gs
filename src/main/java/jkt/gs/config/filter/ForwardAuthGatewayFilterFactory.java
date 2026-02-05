@@ -3,7 +3,6 @@ package jkt.gs.config.filter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Objects;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
@@ -77,20 +76,21 @@ public class ForwardAuthGatewayFilterFactory
             }
             
         	// Cookie 에서 Access 토큰 추출
-        	HttpCookie access = request.getCookies().getFirst("accessToken");
-        	String accessToken = access == null ? "" : access.getValue();
+        	String accessToken = cookieValue(request, "accessToken");
+        	String refreshToken = cookieValue(request, "refreshToken");
         	
         	// Cookie 에서 Refresh 토큰 추출
-        	HttpCookie refresh = request.getCookies().getFirst("refreshToken");
-        	String refreshToken = refresh == null ? "" : refresh.getValue();
+        	boolean hasAccess = accessToken != null && !accessToken.isBlank();
+        	boolean hasRefresh = refreshToken != null && !refreshToken.isBlank();
             
             // 인증체크
-            if(Objects.nonNull(access) && Objects.nonNull(refresh)) {
+            if (hasAccess) {
             	// 인증 체크
                 return webClient.post()
                     .uri("/token/validate") // 토큰 검증 엔드포인트
                     .headers(h -> {
                         h.setBearerAuth(accessToken);                       
+                        h.set(HttpHeaders.USER_AGENT, "gs");
                         h.set("X-Gateway-Secret", this.gsKey);
                     })
                     .retrieve()
@@ -102,15 +102,43 @@ public class ForwardAuthGatewayFilterFactory
                     .flatMap(resp -> chain.filter(exchange))
                     // 검증 실패 시 401
                     .onErrorResume(e -> {
-                        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                        return exchange.getResponse().setComplete();
+                        if (!hasRefresh) {
+                            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                            return exchange.getResponse().setComplete();
+                        }
+
+                        return webClient.post()
+                            .uri("/token/refresh")
+                            .headers(h -> {
+                                h.set("refreshToken", refreshToken);
+                                h.set(HttpHeaders.USER_AGENT, "gs");
+                                h.set("X-Gateway-Secret", this.gsKey);
+                            })
+                            .retrieve()
+                            .onStatus(status -> !status.is2xxSuccessful(),
+                                      resp -> Mono.error(new RuntimeException("Invalid token")))
+                            .toBodilessEntity()
+                            .flatMap(resp -> {
+                                var setCookies = resp.getHeaders().get(HttpHeaders.SET_COOKIE);
+                                if (setCookies != null) {
+                                    setCookies.forEach(c -> exchange.getResponse()
+                                        .getHeaders()
+                                        .add(HttpHeaders.SET_COOKIE, c));
+                                }
+                                return chain.filter(exchange);
+                            })
+                            .onErrorResume(err -> {
+                                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                                return exchange.getResponse().setComplete();
+                            });
                     });
-            } else if(Objects.isNull(access) && Objects.nonNull(refresh)) {
+            } else if (hasRefresh) {
             	// Access 리플레시
             	return webClient.post()
                     .uri("/token/refresh") // 토큰 검증 엔드포인트
                     .headers(h -> {
                         h.set("refreshToken", refreshToken);
+                        h.set(HttpHeaders.USER_AGENT, "gs");
                         h.set("X-Gateway-Secret", this.gsKey);
                     })
                     .retrieve()
@@ -158,6 +186,12 @@ public class ForwardAuthGatewayFilterFactory
                 return response.setComplete();
             }
         };
+    }
+
+    private static String cookieValue(ServerHttpRequest request, String name) {
+        HttpCookie cookie = request.getCookies().getFirst(name);
+        if (cookie == null) return null;
+        return cookie.getValue();
     }
 }
 
