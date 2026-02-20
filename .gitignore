@@ -53,3 +53,5 @@ local.properties
 .recommenders/
 /.mvn/
 .vscode/launch.json
+/md/*.md
+.vscode/settings.json
