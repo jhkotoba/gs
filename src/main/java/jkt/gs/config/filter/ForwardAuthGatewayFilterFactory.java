@@ -1,8 +1,10 @@
 package jkt.gs.config.filter;
 
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
@@ -19,6 +21,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ServerWebExchange;
 
 import reactor.core.publisher.Mono;
+
+import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ORIGINAL_REQUEST_URL_ATTR;
 
 @Component
 public class ForwardAuthGatewayFilterFactory
@@ -175,8 +179,9 @@ public class ForwardAuthGatewayFilterFactory
     }
 
     private static Mono<Void> redirectToLogin(ServerWebExchange exchange, ServerHttpRequest request) {
-        String originalPath = request.getURI().getRawPath();
-        String originalQuery = request.getURI().getRawQuery();
+        URI originalRequestUri = resolveOriginalRequestUri(exchange, request);
+        String originalPath = originalRequestUri.getRawPath();
+        String originalQuery = originalRequestUri.getRawQuery();
         String redirectTo = "/auth/login";
 
         if (originalPath != null && !originalPath.isEmpty()) {
@@ -192,6 +197,14 @@ public class ForwardAuthGatewayFilterFactory
         response.setStatusCode(HttpStatus.SEE_OTHER);
         response.getHeaders().set("Location", redirectTo);
         return response.setComplete();
+    }
+
+    private static URI resolveOriginalRequestUri(ServerWebExchange exchange, ServerHttpRequest fallbackRequest) {
+        Set<URI> originalRequestUris = exchange.getAttribute(GATEWAY_ORIGINAL_REQUEST_URL_ATTR);
+        if (originalRequestUris != null && !originalRequestUris.isEmpty()) {
+            return originalRequestUris.iterator().next();
+        }
+        return fallbackRequest.getURI();
     }
 
     private static boolean isApiPath(String path) {
