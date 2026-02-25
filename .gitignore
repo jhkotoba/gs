@@ -55,3 +55,6 @@ local.properties
 .vscode/launch.json
 /md/*.md
 .vscode/settings.json
+
+CLAUDE.md
+CLAUDE_KO.md
