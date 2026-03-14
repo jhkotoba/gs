@@ -29,6 +29,7 @@ public class ForwardAuthGatewayFilterFactory
     extends AbstractGatewayFilterFactory<ForwardAuthGatewayFilterFactory.Config> {
 
     private static final String AUTH_USER_ID = "X-Auth-User-Id";
+    private static final String AUTH_LOGIN_ID = "X-Auth-Login-Id";
     private static final String AUTH_PROVIDER = "X-Auth-Provider";
     private static final String AUTH_ROLE = "X-Auth-Role";
     private static final String AUTH_SESSION = "X-Auth-Session";
@@ -121,6 +122,7 @@ public class ForwardAuthGatewayFilterFactory
 
     private Mono<Void> forwardWithIdentity(ServerWebExchange exchange, GatewayFilterChain chain, HttpHeaders headers) {
         String userId = headers.getFirst(AUTH_USER_ID);
+        String loginId = headers.getFirst(AUTH_LOGIN_ID);
         String provider = firstNonBlank(headers.getFirst(AUTH_PROVIDER), PROVIDER_OE);
         String role = headers.getFirst(AUTH_ROLE);
         String session = headers.getFirst(AUTH_SESSION);
@@ -129,20 +131,25 @@ public class ForwardAuthGatewayFilterFactory
             return unauthorized(exchange);
         }
 
-        ServerWebExchange authExchange = withAuthHeaders(exchange, userId, provider, role, session);
+        ServerWebExchange authExchange = withAuthHeaders(exchange, userId, loginId, provider, role, session);
         return chain.filter(authExchange);
     }
 
-    private static ServerWebExchange withAuthHeaders(ServerWebExchange exchange, String userId, String provider, String role, String session) {
+    private static ServerWebExchange withAuthHeaders(ServerWebExchange exchange, String userId, String loginId, String provider, String role, String session) {
         ServerHttpRequest requestWithAuth = exchange.getRequest().mutate()
             .headers(headers -> {
                 headers.remove(AUTH_USER_ID);
+                headers.remove(AUTH_LOGIN_ID);
                 headers.remove(AUTH_PROVIDER);
                 headers.remove(AUTH_ROLE);
                 headers.remove(AUTH_SESSION);
 
                 headers.set(AUTH_USER_ID, userId);
                 headers.set(AUTH_PROVIDER, provider);
+
+                if (!isBlank(loginId)) {
+                    headers.set(AUTH_LOGIN_ID, loginId);
+                }
 
                 if (!isBlank(role)) {
                     headers.set(AUTH_ROLE, role);
