@@ -55,7 +55,7 @@ public class ForwardAuthGatewayFilterFactory
             String path = request.getURI().getPath();
             boolean isApiPath = isApiPath(path);
 
-            if (path.startsWith("/auth") || path.startsWith("/token")) {
+            if (path.startsWith("/auth")) {
                 return chain.filter(exchange);
             }
 
